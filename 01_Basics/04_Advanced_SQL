@@ -1,0 +1,200 @@
+--Q1. Find employees whose salary is higher than the average salary of their own department.
+select e.name,e.department, e.salary from employees e
+    where e.salary > (
+        select avg(e2.salary) from employees e2 where e2.department = e.department
+    )
+--Q2. Find the employee(s) who have the highest salary in each department.
+select e.name,e.department, e.salary from employees e
+    where e.salary =(
+        select max(e2.salary) from employees e2 where e2.department = e.department
+    )
+--Q3. Find employees who earn more than the average salary of their department, and show their department manager as well.
+select e.name,e.department,d.manager, e.salary from employees e join departments d on e.department = d.department_name
+    where e.salary > (
+        select avg(e2.salary) from employees e2 where e2.department = e.department
+    )
+--Q4. Find the second-highest salary in each department and the employee(s) earning that salary.
+SELECT e.name,e.department, e.salary FROM employees e
+WHERE e.salary = (
+    SELECT MAX(e2.salary)
+    FROM employees e2
+    WHERE e2.department = e.department
+      AND e2.salary < (
+          SELECT MAX(e3.salary)
+          FROM employees e3
+          WHERE e3.department = e.department
+      )
+);
+
+---------------------------------------------------------------------------------------------------------------
+select name, department, salary, DENSE_RANK () over(
+    order by salary desc) as [Salary Rank]
+        from employees
+
+--Q2. Rank employees based on salary within their own department."
+select name, department, salary, DENSE_RANK() over(
+partition by department order by salary desc) as [Salary Rank by Department] from employees
+--Q3. Assign a unique row number to every employee based on salary from highest to lowest.
+select name, salary,  ROW_NUMBER() over(
+    order by salary desc
+) as [Rank by Salary] from employees
+-- Q4. Give each employee a unique row number based on salary within their department.
+select name, department, salary,  ROW_NUMBER() over(
+    partition by department order by salary desc) as [Rank by Salary] from employees
+--Q5. Ranks employees by salary within each department using Rank()
+select name, department, salary, RANK() over(
+    partition by department order by salary desc) [Rank by Salary]
+from employees
+
+
+----------------------- CTE---------------------
+
+--Find the top 2 highest-paid employees in every department.
+with ranked_employees as (
+    select name, department, salary,
+    DENSE_RANK() over(partition by department order by salary desc) as salary_Rank
+    from employees
+)
+select name, department, salary from ranked_employees where salary_Rank <=2
+
+--Q1. Find the highest-paid employee from each department using a CTE + DENSE_RANK()
+with highest_paid as (
+    select name, department, salary,
+    DENSE_RANK() over(partition by department order by salary desc) as salary_rank
+    from employees
+)
+select name, department, salary from highest_paid where salary_rank = 1
+
+--Q2. Second-highest-paid employee in each department using CTE + DENSE_RANK().
+with second_high as (
+    select name, department, salary, 
+    DENSE_RANK() over(partition by department order by salary desc) as salary_rank
+    from employees
+)
+select name, department, salary from second_high where salary_rank = 2
+
+--Q3. Find the top 2 highest-paid employees from each department, but this time use ROW_NUMBER() instead of DENSE_RANK().
+with second_high as(
+    select name, department, salary,
+    ROW_NUMBER() over(partition by department order by salary desc) as salary_rankk
+    from employees
+)
+select name, department, salary from second_high where salary_rankk <= 2
+
+-- Using a CTE, find all employees whose salary is greater than 80,000.
+with salary_cal as (
+    select name,department, salary from employees
+)
+select name, department, salary from salary_cal where salary > 80000
+
+--Using a CTE, calculate the average salary of each department, then return only departments whose average salary is greater than 75,000.
+with avg_salary as (
+    select department, avg(salary) [Average Salary] from employees group by department having avg(salary) > 75000
+)
+select department, [Average Salary] from avg_salary
+
+--Find the highest-paid employee in each department.
+with highest_pay as (
+    select name, department, salary, ROW_NUMBER() over(
+        partition by department order by salary desc
+    ) as salary_rank
+    from employees
+)
+select name, department, salary from highest_pay where salary_rank = 1
+
+--Find the top 2 highest-paid employees in each department.
+with high_paid as (
+    select name, department, salary, DENSE_RANK() over(
+        partition by department order by salary desc
+    ) as salary_rank
+    from employees
+)
+select name, department, salary from high_paid where salary_rank=2
+
+--Find the second-highest salary in each department, but return only the department and salary, not the employee name.
+with high_paid1 as(
+    select department, salary, DENSE_RANK() over(
+        partition by department order by salary desc
+    ) as salary_rank1
+    from employees
+)
+select department, salary from high_paid1 where salary_rank1<=2
+
+--Find employees whose salary is higher than their department's average salary.
+WITH dept_avg AS (
+    SELECT department, AVG(salary) AS [Department Average] FROM employees GROUP BY department
+)
+SELECT
+    e.name,
+    e.department,
+    e.salary,
+    d.[Department Average]
+FROM employees e JOIN dept_avg d ON e.department = d.department WHERE e.salary > d.[Department Average];
+
+--Find the top 3 highest-paid employees in the entire company using a CTE.
+with top_3 as (
+    select name, department, salary, ROW_NUMBER() over(
+        order by salary desc
+    ) as salary_rank2
+    from employees
+)
+select name, department, salary from top_3 where salary_rank2 <=3
+
+--Find the department that has the highest average salary.
+WITH dept_avg AS (
+    SELECT department, AVG(salary) AS Average_Salary FROM employees GROUP BY department
+),
+ranked_dept AS (
+    SELECT department, Average_Salary, DENSE_RANK() OVER ( ORDER BY Average_Salary DESC
+        ) AS avg_rank
+    FROM dept_avg
+)
+SELECT
+    department,
+    Average_Salary
+FROM ranked_dept
+WHERE avg_rank = 1;
+
+-- Find the highest-paid employee from each department, along with the department manager.
+with high_paid as (
+    select name, salary, department_name, manager, ROW_NUMBER() over(
+        partition by department order by salary desc
+    ) as salary_rankkk
+    from employees join departments  on employees.department = departments.department_name
+)
+select name, salary, department_name, manager from high_paid where salary_rankkk = 1
+
+--Find employees who are among the top 2 highest-paid employees in their department AND earn more than ₹80,000.
+with top2_high as (
+    select name, department, salary, DENSE_RANK() over(
+        partition by department order by salary desc
+    ) as salary_rankkkk
+    from employees
+)
+select name, department, salary from top2_high where salary_rankkkk <= 2 and salary > 80000
+----Find employees who are among the top 2 highest-paid employees in their department AND earn more than ₹80,000.
+with high2 as (
+    select name, department, salary, DENSE_RANK() over(
+        partition by department order by salary desc
+    ) as rank_salary
+    from employees
+)
+select name, department, salary from high2 where rank_salary <=2 and salary > 80000
+
+---- Find the highest-paid employee from each department, along with the department manager.
+with high_paid1 as (
+    select e.name, d.department_name, e.salary, d.manager, DENSE_RANK() over(
+        partition by department order by salary desc
+    ) as ranked_salary
+    from employees e join departments d on e.department = d.department_name
+)
+select name, salary, department_name, manager from high_paid1 where ranked_salary = 1
+
+----Find the top 3 highest-paid employees in the entire company using a CTE.
+with top_3 as (
+    select name, department, salary, ROW_NUMBER() over(
+        order by salary desc
+    ) as salary_rankedd
+    from employees
+)
+select name, department, salary from top_3 where salary_rankedd<=3
